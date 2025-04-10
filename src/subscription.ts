@@ -3,6 +3,41 @@ import {
   isCommit,
 } from './lexicon/types/com/atproto/sync/subscribeRepos'
 import { FirehoseSubscriptionBase, getOpsByType } from './util/subscription'
+import axios from 'axios'
+
+// Add this function to check relevance using LLM
+async function isRelevantToUKEducation(text: string): Promise<boolean> {
+  try {
+    const response = await axios({
+      method: 'post',
+      url: 'https://llm.staffroom.chat/api/chat/completions',
+      headers: {
+        'Authorization': `Bearer ${process.env.OPEN_WEB_UI_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      data: {
+        model: "gemma3:1b",
+        messages: [
+          {
+            content: `Is the text below related to United Kingdom education (Keywords: 'Primary education', 'GCSE', 'A-Level', 'A Level', 'TeachUK', 'EdTech', 'UK Schools', 'UK Education', 'UK Teachers', 'UK Curriculum', 'UK Students', 'UK Learning', 'UK Classrooms', 'UK Universities', 'UK Colleges', 'UK Academies', 'UK Tutors', 'AQA', 'Edexcel', 'OCR', 'WJEC', 'Cambridge', 'IB', 'BTEC', 'SATs', 'GCSEs', 'AQA GCSE', 'Edexcel GCSE', 'OCR GCSE', 'WJEC GCSE', 'Cambridge GCSE', 'UK Education Policy', 'UK Education System', 'UK Higher Education', 'UK Primary Education', 'UK Educational Standards', 'UK Learning Outcomes')? Give rating from 0 to 10 where 0 is not relevant at all and 10 is the most relevant to UK education. Don't make it too sensitive. Only respond as a number. I don't want explanation. Text: ${text}`,
+            role: "user"
+          }
+        ]
+      }
+    });
+    
+    // Extract the relevance score (expecting just a number in the response)
+    const relevanceScore = parseInt(response.data.choices[0].message.content.trim(), 10);
+    console.log(`Relevance score for post: ${relevanceScore}`);
+    
+    // Consider posts with score 6 or higher as relevant to UK education
+    return relevanceScore >= 5;
+  } catch (error) {
+    console.error('Error checking relevance with LLM:', error);
+    // In case of error, fall back to keyword matching
+    return true;
+  }
+}
 
 export class FirehoseSubscription extends FirehoseSubscriptionBase {
   async handleEvent(evt: RepoEvent) {
@@ -10,38 +45,63 @@ export class FirehoseSubscription extends FirehoseSubscriptionBase {
 
     const ops = await getOpsByType(evt)
 
-    // This logs the text of every post off the firehose.
-    // Just for fun :)
-    // Delete before actually using
-    // for (const post of ops.posts.creates) {
-    //   console.log(post.record.text)
-    // }
-
     const postsToDelete = ops.posts.deletes.map((del) => del.uri)
 
-    // Define an array of education-related terms to match
-    const educationTerms = ['UKed', 'EduSky', 'GCSE', 'A-Level', 'A Level', 'TeachUK', 'EdTech'];
+    // Split the arrays for better control
+    const hashtagTerms = ['UKed', 'EduSky'];
+    
+    const plainTerms = [
+      'GCSE', 'A-Level', 'TeachUK', 'EdTech', 'AQA', 
+      'Edexcel', 'OCR', 'WJEC',
+      'IB', 'BTEC', 'SATs', 'GCSEs', 
+    ];
 
-    // Create a regex pattern that matches any term in the array
-    // The \b ensures we match whole words, and the 'i' flag makes it case-insensitive
-    const termsPattern = new RegExp(`#?(${educationTerms.join('|')})\\b`, 'i');
+    // Create regex patterns with proper word boundaries
+    const hashtagPattern = new RegExp(`#(${hashtagTerms.join('|')})\\b`, 'i');
+    const plainTermsPattern = new RegExp(`\\b(${plainTerms.join('|')})\\b`, 'i');
 
-    const postsToCreate = ops.posts.creates
-      .filter((create) => {
-        // only alf-related posts
-        // return create.record.text.toLowerCase().includes('alf')
-
-        // Check if post contains any of our education terms
-        return termsPattern.test(create.record.text);
-      })
-      .map((create) => {
-        // map alf-related posts to a db row
-        return {
+    // const postsToCreate = ops.posts.creates
+    //   .filter(async (create) => {
+    //     // Check if post contains any of our education terms
+    //     const text = create.record.text;
+    //     const keywordFilteredPost = hashtagPattern.test(text) || plainTermsPattern.test(text);
+    //     if (!keywordFilteredPost) {
+    //       return false
+    //     } else {
+    //       // Check relevance using LLM
+    //       console.log(`Checking relevance for post: ${text}`);
+    //       const isRelevant = await isRelevantToUKEducation(text);
+    //       return isRelevant;
+    //     }
+    //   })
+    //   .map((create) => {
+    //     return {
+    //       uri: create.uri,
+    //       cid: create.cid,
+    //       indexedAt: new Date().toISOString(),
+    //     }
+    //   })
+    
+    const filteredPostsPromises = await Promise.all(ops.posts.creates.map(async (create) => {
+      // Check if post contains any of our education terms
+      const text = create.record.text;
+      const keywordFilteredPost = hashtagPattern.test(text) || plainTermsPattern.test(text);
+      
+      if (!keywordFilteredPost) {
+        return null;
+      } else {
+        // Check relevance using LLM
+        console.log(`Checking relevance for post: ${text}`);
+        const isRelevant = await isRelevantToUKEducation(text);
+        return isRelevant ? {
           uri: create.uri,
           cid: create.cid,
           indexedAt: new Date().toISOString(),
-        }
-      })
+        } : null;
+      }
+    }));
+    
+    const postsToCreate = filteredPostsPromises.filter(post => post !== null);
 
     if (postsToDelete.length > 0) {
       await this.db

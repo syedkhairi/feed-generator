@@ -42,9 +42,6 @@ export class FirehoseSubscription extends FirehoseSubscriptionBase {
     const ops = await getOpsByType(evt)
 
     const postsToDelete = ops.posts.deletes.map((del) => del.uri)
-
-    // Split the arrays for better control
-    const hashtagTerms = ['UKed', 'EduSky'];
     
     // const plainTerms = [
     //   'GCSE', 'A-Level', 'TeachUK', 'EdTech', 'AQA', 
@@ -52,8 +49,14 @@ export class FirehoseSubscription extends FirehoseSubscriptionBase {
     //   'IB', 'BTEC', 'SATs', 'GCSEs', 
     // ];
 
+    // Split the arrays for better control
+    const ukEdHashtag = 'UKEd';
+    const eduSkyHashtag = 'EduSky';
+    
     // Create regex patterns with proper word boundaries
-    const hashtagPattern = new RegExp(`#(${hashtagTerms.join('|')})\\b`, 'i');
+    const ukEdPattern = new RegExp(`#(${ukEdHashtag})\\b`, 'i');
+    const eduSkyPattern = new RegExp(`#(${eduSkyHashtag})\\b`, 'i');
+    
     // const plainTermsPattern = new RegExp(`\\b(${plainTerms.join('|')})\\b`, 'i');
 
     // const postsToCreate = ops.posts.creates
@@ -81,13 +84,21 @@ export class FirehoseSubscription extends FirehoseSubscriptionBase {
     const filteredPostsPromises = await Promise.all(ops.posts.creates.map(async (create) => {
       // Check if post contains any of our education terms
       const text = create.record.text;
-      const keywordFilteredPost = hashtagPattern.test(text);
       
-      if (!keywordFilteredPost) {
-        return null;
-      } else {
+      // If text contains #UKEd, immediately accept it
+      if (ukEdPattern.test(text)) {
+        console.log(`Post contains #UKEd, automatically including it`);
+        return {
+          uri: create.uri,
+          cid: create.cid,
+          indexedAt: new Date().toISOString(),
+        };
+      }
+      
+      // If text contains #EduSky, run it through the LLM
+      if (eduSkyPattern.test(text)) {
         // Check relevance using LLM
-        console.log(`Checking relevance for post: ${text}`);
+        console.log(`Post contains #EduSky, checking relevance: ${text}`);
         const isRelevant = await isRelevantToUKEducation(text);
         return isRelevant ? {
           uri: create.uri,
@@ -95,6 +106,9 @@ export class FirehoseSubscription extends FirehoseSubscriptionBase {
           indexedAt: new Date().toISOString(),
         } : null;
       }
+      
+      // If it doesn't contain either hashtag, filter it out
+      return null;
     }));
     
     const postsToCreate = filteredPostsPromises.filter(post => post !== null);

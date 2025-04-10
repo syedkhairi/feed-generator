@@ -19,16 +19,20 @@ export class FirehoseSubscription extends FirehoseSubscriptionBase {
 
     const postsToDelete = ops.posts.deletes.map((del) => del.uri)
 
-    // The regex pattern with 'i' flag for case-insensitive matching
-    const hashtagPattern = /#(UKed|EduSky)\b/i;
+    // Define an array of education-related terms to match
+    const educationTerms = ['UKed', 'EduSky', 'GCSE', 'A-Level', 'A Level', 'TeachUK', 'EdTech'];
+
+    // Create a regex pattern that matches any term in the array
+    // The \b ensures we match whole words, and the 'i' flag makes it case-insensitive
+    const termsPattern = new RegExp(`#?(${educationTerms.join('|')})\\b`, 'i');
 
     const postsToCreate = ops.posts.creates
       .filter((create) => {
         // only alf-related posts
         // return create.record.text.toLowerCase().includes('alf')
 
-        // Check for #UKed or #EduSky using case-insensitive regex
-        return hashtagPattern.test(create.record.text);
+        // Check if post contains any of our education terms
+        return termsPattern.test(create.record.text);
       })
       .map((create) => {
         // map alf-related posts to a db row

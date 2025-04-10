@@ -10,23 +10,15 @@ async function isRelevantToUKEducation(text: string): Promise<boolean> {
   try {
     const response = await axios({
       method: 'post',
-      url: 'https://llm.staffroom.chat/api/chat/completions',
+      url: 'https://llm.staffroom.chat/ollama/api/generate',
       headers: {
         'Authorization': `Bearer ${process.env.OPEN_WEB_UI_API_KEY}`,
         'Content-Type': 'application/json'
       },
       data: {
         model: "gemma3:1b",
-        messages: [
-          {
-            role: "developer",
-            content: "You are a helpful assistant. You will be given a text and you need to rate its relevance to UK education and schools and teachers. Please give a rating from 0 to 10 where 0 is not relevant at all and 10 is the most relevant to UK education. Don't make it too sensitive. Only respond with a number. I don't want explanation."
-          },
-          {
-            role: "user",
-            content: `${text}`
-          }
-        ]
+        prompt: `You are a helpful assistant. You will be given a text and you need to rate its relevance to UK education and schools and teachers. Please give a rating from 0 to 10 where 0 is not relevant at all and 10 is the most relevant to UK education. Don't make it too sensitive. Only respond with a number. I don't want explanation. Text: ${text}`,
+        stream: false
       }
     });
     

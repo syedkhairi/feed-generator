@@ -23,7 +23,7 @@ async function isRelevantToUKEducation(text: string): Promise<boolean> {
     });
     
     // Extract the relevance score (expecting just a number in the response)
-    const relevanceScore = parseInt(response.data.choices[0].message.content.trim(), 10);
+    const relevanceScore = parseInt(response.data.response.trim(), 10);
     console.log(`Relevance score for post: ${relevanceScore}`);
     
     // Consider posts with score 6 or higher as relevant to UK education

@@ -18,10 +18,17 @@ export class FirehoseSubscription extends FirehoseSubscriptionBase {
     // }
 
     const postsToDelete = ops.posts.deletes.map((del) => del.uri)
+
+    // The regex pattern with 'i' flag for case-insensitive matching
+    const hashtagPattern = /#(UKed|EduSky)\b/i;
+
     const postsToCreate = ops.posts.creates
       .filter((create) => {
         // only alf-related posts
-        return create.record.text.toLowerCase().includes('alf')
+        // return create.record.text.toLowerCase().includes('alf')
+
+        // Check for #UKed or #EduSky using case-insensitive regex
+        return hashtagPattern.test(create.record.text);
       })
       .map((create) => {
         // map alf-related posts to a db row

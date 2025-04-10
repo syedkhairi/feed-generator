@@ -19,8 +19,12 @@ async function isRelevantToUKEducation(text: string): Promise<boolean> {
         model: "gemma3:1b",
         messages: [
           {
-            content: `Is the text below related to UK education and schools and teachers? Give rating from 0 to 10 where 0 is not relevant at all and 10 is the most relevant to UK education. Don't make it too sensitive. Only respond as a number. I don't want explanation. Text: ${text}`,
-            role: "user"
+            role: "developer",
+            content: "You are a helpful assistant. You will be given a text and you need to rate its relevance to UK education and schools and teachers. Please give a rating from 0 to 10 where 0 is not relevant at all and 10 is the most relevant to UK education. Don't make it too sensitive. Only respond with a number. I don't want explanation."
+          },
+          {
+            role: "user",
+            content: `${text}`
           }
         ]
       }
@@ -31,7 +35,7 @@ async function isRelevantToUKEducation(text: string): Promise<boolean> {
     console.log(`Relevance score for post: ${relevanceScore}`);
     
     // Consider posts with score 6 or higher as relevant to UK education
-    return relevanceScore >= 5;
+    return relevanceScore >= 6;
   } catch (error) {
     console.error('Error checking relevance with LLM:', error);
     // In case of error, fall back to keyword matching

@@ -19,7 +19,7 @@ async function isRelevantToUKEducation(text: string): Promise<boolean> {
         model: "gemma3:1b",
         messages: [
           {
-            content: `Is the text below related to United Kingdom education (Keywords: 'Primary education', 'GCSE', 'A-Level', 'A Level', 'TeachUK', 'EdTech', 'UK Schools', 'UK Education', 'UK Teachers', 'UK Curriculum', 'UK Students', 'UK Learning', 'UK Classrooms', 'UK Universities', 'UK Colleges', 'UK Academies', 'UK Tutors', 'AQA', 'Edexcel', 'OCR', 'WJEC', 'Cambridge', 'IB', 'BTEC', 'SATs', 'GCSEs', 'AQA GCSE', 'Edexcel GCSE', 'OCR GCSE', 'WJEC GCSE', 'Cambridge GCSE', 'UK Education Policy', 'UK Education System', 'UK Higher Education', 'UK Primary Education', 'UK Educational Standards', 'UK Learning Outcomes')? Give rating from 0 to 10 where 0 is not relevant at all and 10 is the most relevant to UK education. Don't make it too sensitive. Only respond as a number. I don't want explanation. Text: ${text}`,
+            content: `Is the text below related to UK education and schools and teachers? Give rating from 0 to 10 where 0 is not relevant at all and 10 is the most relevant to UK education. Don't make it too sensitive. Only respond as a number. I don't want explanation. Text: ${text}`,
             role: "user"
           }
         ]
@@ -50,15 +50,15 @@ export class FirehoseSubscription extends FirehoseSubscriptionBase {
     // Split the arrays for better control
     const hashtagTerms = ['UKed', 'EduSky'];
     
-    const plainTerms = [
-      'GCSE', 'A-Level', 'TeachUK', 'EdTech', 'AQA', 
-      'Edexcel', 'OCR', 'WJEC',
-      'IB', 'BTEC', 'SATs', 'GCSEs', 
-    ];
+    // const plainTerms = [
+    //   'GCSE', 'A-Level', 'TeachUK', 'EdTech', 'AQA', 
+    //   'Edexcel', 'OCR', 'WJEC',
+    //   'IB', 'BTEC', 'SATs', 'GCSEs', 
+    // ];
 
     // Create regex patterns with proper word boundaries
     const hashtagPattern = new RegExp(`#(${hashtagTerms.join('|')})\\b`, 'i');
-    const plainTermsPattern = new RegExp(`\\b(${plainTerms.join('|')})\\b`, 'i');
+    // const plainTermsPattern = new RegExp(`\\b(${plainTerms.join('|')})\\b`, 'i');
 
     // const postsToCreate = ops.posts.creates
     //   .filter(async (create) => {
@@ -85,7 +85,7 @@ export class FirehoseSubscription extends FirehoseSubscriptionBase {
     const filteredPostsPromises = await Promise.all(ops.posts.creates.map(async (create) => {
       // Check if post contains any of our education terms
       const text = create.record.text;
-      const keywordFilteredPost = hashtagPattern.test(text) || plainTermsPattern.test(text);
+      const keywordFilteredPost = hashtagPattern.test(text);
       
       if (!keywordFilteredPost) {
         return null;

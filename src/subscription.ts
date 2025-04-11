@@ -4,6 +4,7 @@ import {
 } from './lexicon/types/com/atproto/sync/subscribeRepos'
 import { FirehoseSubscriptionBase, getOpsByType } from './util/subscription'
 import axios from 'axios'
+import knownAccounts from './known-accounts'
 
 // Add this function to check relevance using LLM
 async function isRelevantToUKEducation(text: string): Promise<boolean> {
@@ -17,7 +18,13 @@ async function isRelevantToUKEducation(text: string): Promise<boolean> {
       },
       data: {
         model: "gemma3:1b",
-        prompt: `You are a helpful assistant. You will be given a text and you need to rate its relevance to UK education and schools and teachers. Please give a rating from 0 to 10 where 0 is not relevant at all and 10 is the most relevant to UK education. Don't make it too sensitive. Only respond with a number. I don't want explanation. Text: ${text}`,
+        prompt: `
+          You are an expert in UK education and social media analysis. Read the following post text carefully:
+
+          "${text}"
+
+          Please rate the relevance of this post to UK education on a scale from 1 to 10, where 1 means "completely unrelated" and 10 means "highly relevant". In your response, provide only the numerical rating followed by a brief explanation (in one or two sentences) highlighting the key factors that influenced your rating. Focus on elements such as references to UK-specific qualifications (e.g., GCSE, A-Levels), institutions (e.g., Ofsted, UCAS), local terminology, or any clear indicators tying the post to the UK education system.
+        `,
         stream: false
       }
     });
@@ -82,6 +89,21 @@ export class FirehoseSubscription extends FirehoseSubscriptionBase {
     //   })
     
     const filteredPostsPromises = await Promise.all(ops.posts.creates.map(async (create) => {
+      // Check if post is from a known account to bypass any filters
+      try {
+        const account = knownAccounts.find(account => account.did === create.author);
+        if (account) {
+          console.log(`Post from known account ${account.name}, automatically including it`);
+          return {
+            uri: create.uri,
+            cid: create.cid,
+            indexedAt: new Date().toISOString(),
+          };
+        }
+      } catch (error) {
+        console.error('Error checking known accounts:', error);
+      }
+
       // Check if post contains any of our education terms
       const text = create.record.text;
       
@@ -95,7 +117,7 @@ export class FirehoseSubscription extends FirehoseSubscriptionBase {
         };
       }
       
-      // If text contains #EduSky, run it through the LLM
+      // If text contains #EduSky, run it through the LLM to check relevance
       if (eduSkyPattern.test(text)) {
         // Check relevance using LLM
         console.log(`Post contains #EduSky, checking relevance: ${text}`);
